@@ -1,0 +1,35 @@
+# Build output
+.gradle/
+.kotlin/
+build/
+app/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# JVM crash / profiling dumps
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# Local config / secrets
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Command Code local state
+.commandcode/
