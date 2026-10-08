@@ -107,7 +107,10 @@ fun DiagnosticsScreen(
                             "系统应用" to yesNo(d.framework.isSystemApp),
                             "版本" to "${d.framework.versionName ?: "-"} (${d.framework.versionCode ?: "-"})",
                             "版本类型" to buildFlavor(d.framework.versionName),
-                            "推送支持" to pushSupportText(d.framework.declaresPushSupport),
+                            "推送支持" to pushSupportText(
+                                d.framework.declaresPushSupport,
+                                d.framework.signatureIsOfficial,
+                            ),
                             "官方签名" to when (d.framework.signatureIsOfficial) {
                                 true -> "是"
                                 false -> "否"
@@ -118,12 +121,23 @@ fun DiagnosticsScreen(
                         ),
                     )
 
-                    val frameworkUnsupported = d.framework.declaresPushSupport == false ||
-                        d.framework.versionName?.endsWith("-G", ignoreCase = true) == true
+                    // 国际版空壳的判定只对官方签名框架成立；第三方框架（如 MiPushFramework）本 App 不适配。
+                    val official = d.framework.signatureIsOfficial
+                    val frameworkUnsupported = official == true &&
+                        (d.framework.declaresPushSupport == false ||
+                            d.framework.versionName?.endsWith("-G", ignoreCase = true) == true)
                     if (frameworkUnsupported) {
                         Text(
                             text = "当前服务框架不支持系统推送（国际版 -G）：它只声明了推送组件、" +
                                 "没有推送实现，任何应用都不会向它注册。需要换成国区版（-C）服务框架。",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (official == false) {
+                        Text(
+                            text = "服务框架不是官方签名（第三方替换，例如 MiPushFramework）：" +
+                                "本 App 只适配官方框架，对第三方框架的判定不适用，下面的数值仅供参考。",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -222,10 +236,11 @@ private fun buildFlavor(versionName: String?): String = when {
     else -> "未知"
 }
 
-private fun pushSupportText(declares: Boolean?): String = when (declares) {
-    true -> "支持"
-    false -> "不支持（缺推送实现）"
-    null -> "未知"
+private fun pushSupportText(declares: Boolean?, signatureIsOfficial: Boolean?): String = when {
+    signatureIsOfficial == false -> "未知（非官方框架，本 App 不适配）"
+    declares == true -> "支持"
+    declares == false -> "不支持（缺推送实现）"
+    else -> "未知"
 }
 
 private fun frameworkVerdictText(verdict: FrameworkVerdict): String = when (verdict) {
