@@ -49,6 +49,28 @@ class AppInfoResolver(context: Context) {
 
     fun uid(pkg: String): Int? = applicationInfo(pkg)?.uid
 
+    /** 该包的 application meta-data 里是否有 [key]；包不存在返回 null。 */
+    fun hasMetaData(pkg: String, key: String): Boolean? {
+        val info = try {
+            @Suppress("DEPRECATION")
+            pm.getApplicationInfo(pkg, PackageManager.GET_META_DATA)
+        } catch (e: PackageManager.NameNotFoundException) {
+            return null
+        }
+        return info.metaData?.containsKey(key) ?: false
+    }
+
+    /** 该包是否声明了 authority 为 [authority] 的 provider；包不存在返回 null。 */
+    fun hasProvider(pkg: String, authority: String): Boolean? {
+        val info = try {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(pkg, PackageManager.GET_PROVIDERS)
+        } catch (e: PackageManager.NameNotFoundException) {
+            return null
+        }
+        return info.providers?.any { it.authority == authority } ?: false
+    }
+
     /** 首次安装时间（毫秒）；未安装返回 null。用于列表排序。 */
     fun firstInstallTime(pkg: String): Long? = installTimes(pkg)?.first
 

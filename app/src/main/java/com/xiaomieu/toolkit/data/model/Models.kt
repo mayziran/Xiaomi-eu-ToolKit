@@ -84,6 +84,13 @@ data class FrameworkInfo(
     val signingSha256: String?,
     val signatureIsOfficial: Boolean?,
     val verdict: FrameworkVerdict,
+    /**
+     * 官方框架是否声明了"支持系统推送"（`pushSupportFlag` meta-data / PushSupportProvider）。
+     *
+     * 国际版（版本号以 `-G` 结尾）只声明了推送组件、没有这两个标记，也没有推送实现，
+     * 因此任何应用都不会向它注册；[installed] 为 false 或读不到时为 null。
+     */
+    val declaresPushSupport: Boolean? = null,
 )
 
 data class XmsfDiagnostics(

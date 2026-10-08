@@ -106,6 +106,8 @@ fun DiagnosticsScreen(
                             "已安装" to yesNo(d.framework.installed),
                             "系统应用" to yesNo(d.framework.isSystemApp),
                             "版本" to "${d.framework.versionName ?: "-"} (${d.framework.versionCode ?: "-"})",
+                            "版本类型" to buildFlavor(d.framework.versionName),
+                            "推送支持" to pushSupportText(d.framework.declaresPushSupport),
                             "官方签名" to when (d.framework.signatureIsOfficial) {
                                 true -> "是"
                                 false -> "否"
@@ -115,6 +117,17 @@ fun DiagnosticsScreen(
                             "Root" to yesNo(d.rootAvailable),
                         ),
                     )
+
+                    val frameworkUnsupported = d.framework.declaresPushSupport == false ||
+                        d.framework.versionName?.endsWith("-G", ignoreCase = true) == true
+                    if (frameworkUnsupported) {
+                        Text(
+                            text = "当前服务框架不支持系统推送（国际版 -G）：它只声明了推送组件、" +
+                                "没有推送实现，任何应用都不会向它注册。需要换成国区版（-C）服务框架。",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
 
                     InfoCard(
                         "区域",
@@ -200,6 +213,20 @@ fun DiagnosticsScreen(
 }
 
 private fun yesNo(value: Boolean): String = if (value) "是" else "否"
+
+/** 官方服务框架的版本号以 `-C`（国区）或 `-G`（国际）结尾。 */
+private fun buildFlavor(versionName: String?): String = when {
+    versionName == null -> "未知"
+    versionName.endsWith("-C", ignoreCase = true) -> "国区版（-C）"
+    versionName.endsWith("-G", ignoreCase = true) -> "国际版（-G）"
+    else -> "未知"
+}
+
+private fun pushSupportText(declares: Boolean?): String = when (declares) {
+    true -> "支持"
+    false -> "不支持（缺推送实现）"
+    null -> "未知"
+}
 
 private fun frameworkVerdictText(verdict: FrameworkVerdict): String = when (verdict) {
     FrameworkVerdict.OFFICIAL -> "匹配官方服务框架"

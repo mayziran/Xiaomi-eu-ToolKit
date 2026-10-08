@@ -28,11 +28,21 @@ object XmsfPaths {
     const val KEY_DISABLED = "disable_push_pkg_names"
     const val KEY_DISABLED_CACHE = "disable_push_pkg_names_cache"
 
-    // Plain files (under <dataDir>/files/).
+    /** Plain files (under <dataDir>/files/). */
     const val FILE_REGION = "mipush_region"
     const val FILE_COUNTRY_CODE = "mipush_country_code"
     const val FILE_REGION_LOCK = "mipush_region.lock"
     const val FILE_COUNTRY_CODE_LOCK = "mipush_country_code.lock"
+
+    /**
+     * 官方国区框架用这两个声明"本框架支持系统推送"：application 的 `pushSupportFlag` meta-data，
+     * 以及 authority 为 `com.xiaomi.push.provider.PUSH_SUPPORT` 的 provider。
+     *
+     * 国际版（版本号以 `-G` 结尾）是个空壳：保留了推送组件声明，但既没有这两个标记，也没有推送
+     * 实现（连 `xmpush.xiaomi.com` 之类服务器地址都没有），所以任何应用都不会向它注册。
+     */
+    const val META_PUSH_SUPPORT_FLAG = "pushSupportFlag"
+    const val PROVIDER_PUSH_SUPPORT = "com.xiaomi.push.provider.PUSH_SUPPORT"
 
     /** Candidate data directories, in probe order (primary user first). */
     fun dataDirs(userId: Int): List<String> = listOf(

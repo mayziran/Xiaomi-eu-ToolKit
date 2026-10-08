@@ -176,6 +176,13 @@ class XmsfRegistryRepository(
             official == false -> FrameworkVerdict.SIGNATURE_MISMATCH
             else -> FrameworkVerdict.UNKNOWN
         }
+        val flag = appInfoResolver.hasMetaData(XmsfPaths.XMSF_PACKAGE, XmsfPaths.META_PUSH_SUPPORT_FLAG)
+        val provider = appInfoResolver.hasProvider(XmsfPaths.XMSF_PACKAGE, XmsfPaths.PROVIDER_PUSH_SUPPORT)
+        val declaresPushSupport = when {
+            !installed -> null
+            flag == null && provider == null -> null
+            else -> flag == true || provider == true
+        }
         return FrameworkInfo(
             installed = installed,
             isSystemApp = isSystem,
@@ -184,6 +191,7 @@ class XmsfRegistryRepository(
             signingSha256 = cert,
             signatureIsOfficial = official,
             verdict = verdict,
+            declaresPushSupport = declaresPushSupport,
         )
     }
 
