@@ -15,6 +15,7 @@ class AppInfoResolver(context: Context) {
     private val missing = HashSet<String>()
     private val labelCache = LruCache<String, String>(256)
     private val iconCache = LruCache<String, Drawable>(64)
+    private val timesCache = HashMap<String, Pair<Long, Long>>()
 
     fun applicationInfo(pkg: String): ApplicationInfo? {
         if (infoCache.containsKey(pkg)) return infoCache[pkg]
@@ -47,6 +48,23 @@ class AppInfoResolver(context: Context) {
     }
 
     fun uid(pkg: String): Int? = applicationInfo(pkg)?.uid
+
+    /** 首次安装时间（毫秒）；未安装返回 null。用于列表排序。 */
+    fun firstInstallTime(pkg: String): Long? = installTimes(pkg)?.first
+
+    /** 最近更新时间（毫秒）；未安装返回 null。用于列表排序。 */
+    fun lastUpdateTime(pkg: String): Long? = installTimes(pkg)?.second
+
+    private fun installTimes(pkg: String): Pair<Long, Long>? = timesCache[pkg] ?: run {
+        val value = try {
+            val info = pm.getPackageInfo(pkg, 0)
+            info.firstInstallTime to info.lastUpdateTime
+        } catch (e: PackageManager.NameNotFoundException) {
+            null
+        }
+        if (value != null) timesCache[pkg] = value
+        value
+    }
 
     fun versionName(pkg: String): String? = try {
         pm.getPackageInfo(pkg, 0).versionName

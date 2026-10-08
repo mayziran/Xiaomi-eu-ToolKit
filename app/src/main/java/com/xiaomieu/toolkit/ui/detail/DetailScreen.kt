@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -36,11 +37,14 @@ import com.xiaomieu.toolkit.data.model.RegisteredApp
 import com.xiaomieu.toolkit.data.model.MiPushSupport
 import com.xiaomieu.toolkit.ui.components.AppIcon
 import com.xiaomieu.toolkit.ui.components.StatusBadge
+import com.xiaomieu.toolkit.ui.features.FeaturesViewModel
+import com.xiaomieu.toolkit.ui.features.SpoofUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     packageName: String,
+    featuresViewModel: FeaturesViewModel,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -50,6 +54,7 @@ fun DetailScreen(
         factory = DetailViewModelFactory(application, packageName),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val spoofState by featuresViewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -82,7 +87,12 @@ fun DetailScreen(
                         contentAlignment = Alignment.Center,
                     ) { Text("注册表中没有该应用的记录") }
                 } else {
-                    DetailContent(app, Modifier.fillMaxSize().padding(padding))
+                    DetailContent(
+                        app = app,
+                        spoof = spoofState as? SpoofUiState.Ready,
+                        onToggleSpoof = { on -> featuresViewModel.setEnabled(app.packageName, on) },
+                        modifier = Modifier.fillMaxSize().padding(padding),
+                    )
                 }
             }
         }
@@ -90,7 +100,12 @@ fun DetailScreen(
 }
 
 @Composable
-private fun DetailContent(app: RegisteredApp, modifier: Modifier = Modifier) {
+private fun DetailContent(
+    app: RegisteredApp,
+    spoof: SpoofUiState.Ready?,
+    onToggleSpoof: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -125,6 +140,44 @@ private fun DetailContent(app: RegisteredApp, modifier: Modifier = Modifier) {
                 InfoRow("已安装", if (app.installed) "是" else "否")
                 InfoRow("系统应用", if (app.systemApp) "是" else "否")
                 InfoRow("uid", app.uid?.toString() ?: "-")
+            }
+        }
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("机型伪装", style = MaterialTheme.typography.titleMedium)
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("对该应用启用", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "Xiaomi-eu-ToolKit 为 MIUI / HyperOS 系列 ROM 设计，大多数系统无需伪装。" +
+                                "改动后需重启该应用。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = spoof?.enabled?.contains(app.packageName) == true,
+                        onCheckedChange = onToggleSpoof,
+                        enabled = spoof?.moduleInstalled == true,
+                    )
+                }
+
+                when {
+                    spoof == null -> Text(
+                        text = "读取模块配置中…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    !spoof.moduleInstalled -> Text(
+                        text = "未检测到 Zygisk 模块（Xiaomi-eu-ToolKit-Zygisk），开关不可用。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }

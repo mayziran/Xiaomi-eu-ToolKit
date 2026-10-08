@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaomieu.toolkit.data.AppInfoResolver
+import com.xiaomieu.toolkit.data.AppSettings
 import com.xiaomieu.toolkit.data.MiPushScanner
 import com.xiaomieu.toolkit.data.XmsfController
 import com.xiaomieu.toolkit.data.XmsfPaths
@@ -39,6 +40,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    /** 全局设置：所有应用列表是否隐藏系统应用。 */
+    private val _hideSystemApps = MutableStateFlow(AppSettings.hideSystemApps(app))
+    val hideSystemApps: StateFlow<Boolean> = _hideSystemApps.asStateFlow()
 
     init {
         refresh()
@@ -88,6 +93,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = if (ok) "已清除服务框架的数据与缓存" else "操作失败：需要 root 权限"
             refresh()
         }
+    }
+
+    fun setHideSystemApps(value: Boolean) {
+        _hideSystemApps.value = value
+        AppSettings.setHideSystemApps(getApplication(), value)
     }
 
     fun clearMessage() {

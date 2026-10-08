@@ -61,6 +61,8 @@ fun OverviewScreen(
     onOpenDetail: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // 全局设置（开关在「功能」页）。
+    val hideSystem by viewModel.hideSystemApps.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(AppFilter.ALL) }
 
@@ -86,7 +88,7 @@ fun OverviewScreen(
             }
 
             is SnapshotUiState.Ready -> {
-                val all = s.snapshot.apps
+                val all = s.snapshot.apps.filter { !hideSystem || !it.systemApp }
                 val filtered = all.filter { matchesFilter(it, filter) && matchesQuery(it, query) }
                 val counts = AppFilter.entries.associateWith { f -> all.count { matchesFilter(it, f) } }
 
