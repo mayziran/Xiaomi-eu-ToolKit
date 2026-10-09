@@ -102,6 +102,7 @@ fun AppRoot() {
                 val pkg = entry.arguments?.getString("pkg").orEmpty()
                 DetailScreen(
                     packageName = pkg,
+                    mainViewModel = mainViewModel,
                     featuresViewModel = featuresViewModel,
                     onBack = { navController.popBackStack() },
                 )

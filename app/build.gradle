@@ -15,7 +15,9 @@ android {
 
     defaultConfig {
         applicationId "com.xiaomieu.toolkit"
-        minSdk 28
+        // libxposed 的 PackageLoadedParam.defaultClassLoader 标了 @RequiresApi(29)，
+        // 所以最低只能到 29（Android 9 上模块会加载失败）。
+        minSdk 29
         targetSdk 37
         versionCode 1
         versionName "1.0"

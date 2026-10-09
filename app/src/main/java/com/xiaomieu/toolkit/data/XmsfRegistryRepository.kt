@@ -1,5 +1,6 @@
 package com.xiaomieu.toolkit.data
 
+import android.util.Log
 import com.xiaomieu.toolkit.data.model.DataFileStatus
 import com.xiaomieu.toolkit.data.model.FrameworkInfo
 import com.xiaomieu.toolkit.data.model.FrameworkVerdict
@@ -56,24 +57,18 @@ class XmsfRegistryRepository(
 
         val files = mutableListOf<DataFileStatus>()
 
-        val registry = readAndTrack(files, "注册表 (pref_registered_pkg_names)",
+        val registry = readPrefs(files, "注册表 (pref_registered_pkg_names)",
             XmsfPaths.sharedPref(dataDir, XmsfPaths.PREF_REGISTERED),
             missingNote = "还没有任何应用注册（或读取失败）")
-            ?.let { SharedPrefsXmlParser.stringValues(it) }
-            ?.filterValues { it.isNotBlank() }
-            ?: emptyMap()
+            .filterValues { it.isNotBlank() }
 
-        val secrets = readAndTrack(files, "注册密钥 (mipush_apps_scrt)",
+        val secrets = readPrefs(files, "注册密钥 (mipush_apps_scrt)",
             XmsfPaths.sharedPref(dataDir, XmsfPaths.PREF_APPS_SCRT),
             missingNote = "还没有应用注册过（正常）")
-            ?.let { SharedPrefsXmlParser.stringValues(it) }
-            ?: emptyMap()
 
-        val appInfo = readAndTrack(files, "应用信息 (mipush_app_info)",
+        val appInfo = readPrefs(files, "应用信息 (mipush_app_info)",
             XmsfPaths.sharedPref(dataDir, XmsfPaths.PREF_APP_INFO),
             missingNote = "没有任何应用被显式注销或禁用（正常）")
-            ?.let { SharedPrefsXmlParser.stringValues(it) }
-            ?: emptyMap()
         val unregistered = appInfo.packageSet(XmsfPaths.KEY_UNREGISTERED)
         val pushDisabled = appInfo.packageSet(XmsfPaths.KEY_DISABLED)
 
@@ -224,6 +219,24 @@ class XmsfRegistryRepository(
         return content
     }
 
+    /**
+     * 读一个 SharedPreferences XML 并解析成 map。
+     *
+     * 解析失败时只当作"这一项读不到"，不让整个快照失败 —— 否则一个写坏的文件会让总览和诊断
+     * 整页变成"读取失败"。
+     */
+    private fun readPrefs(
+        files: MutableList<DataFileStatus>,
+        label: String,
+        path: String,
+        missingNote: String? = null,
+    ): Map<String, String> {
+        val raw = readAndTrack(files, label, path, missingNote) ?: return emptyMap()
+        return runCatching { SharedPrefsXmlParser.stringValues(raw) }
+            .onFailure { Log.w(TAG, "parse $path failed", it) }
+            .getOrDefault(emptyMap())
+    }
+
     /** Records a file that only matters by its presence, e.g. the framework's `.lock` siblings. */
     private fun trackOnly(
         files: MutableList<DataFileStatus>,
@@ -244,6 +257,8 @@ class XmsfRegistryRepository(
     }
 
     companion object {
+        private const val TAG = "XmsfRegistryRepo"
+
         /** Signing certificate SHA-256 of the official Xiaomi/MIUI-signed service framework. */
         const val OFFICIAL_XMSF_CERT_SHA256 =
             "C9:00:9D:01:EB:F9:F5:D0:30:2B:C7:1B:2F:E9:AA:9A:47:A4:32:BB:A1:73:08:A3:11:1B:75:D7:B2:14:90:25"

@@ -1,6 +1,5 @@
 package com.xiaomieu.toolkit.ui.detail
 
-import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,32 +27,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xiaomieu.toolkit.data.model.RegisteredApp
 import com.xiaomieu.toolkit.data.model.MiPushSupport
+import com.xiaomieu.toolkit.data.model.RegisteredApp
+import com.xiaomieu.toolkit.ui.common.MainViewModel
+import com.xiaomieu.toolkit.ui.common.SnapshotUiState
 import com.xiaomieu.toolkit.ui.components.AppIcon
 import com.xiaomieu.toolkit.ui.components.StatusBadge
 import com.xiaomieu.toolkit.ui.features.FeaturesViewModel
 import com.xiaomieu.toolkit.ui.features.SpoofUiState
 
+/**
+ * 应用详情。
+ *
+ * 数据直接取 [MainViewModel] 里那份快照（总览页用的同一份），不再单独跑一遍全量读取 ——
+ * 之前进详情页会重新执行全部 root 读取 + 全盘扫包，慢且和总览页可能不一致。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     packageName: String,
+    mainViewModel: MainViewModel,
     featuresViewModel: FeaturesViewModel,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val application = context.applicationContext as Application
-    val viewModel: DetailViewModel = viewModel(
-        key = packageName,
-        factory = DetailViewModelFactory(application, packageName),
-    )
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val state by mainViewModel.state.collectAsStateWithLifecycle()
     val spoofState by featuresViewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -69,18 +69,18 @@ fun DetailScreen(
         },
     ) { padding ->
         when (val s = state) {
-            is DetailUiState.Loading -> Box(
+            is SnapshotUiState.Loading -> Box(
                 Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
 
-            is DetailUiState.Failed -> Box(
+            is SnapshotUiState.Failed -> Box(
                 Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
             ) { Text("读取失败：${s.message}") }
 
-            is DetailUiState.Ready -> {
-                val app = s.app
+            is SnapshotUiState.Ready -> {
+                val app = s.snapshot.apps.firstOrNull { it.packageName == packageName }
                 if (app == null) {
                     Box(
                         Modifier.fillMaxSize().padding(padding),
