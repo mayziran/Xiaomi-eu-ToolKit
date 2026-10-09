@@ -1,16 +1,10 @@
 name: Release
 
-# 手动触发（Actions 页面 → Run workflow），也可以推 v* 标签触发。
+# 手动触发：Actions 页面 → Run workflow（不用填任何东西）。
+# 发布标签恒等于 v<app 版本号>（读 app/build.gradle 的 versionName），
+# 所以想发新版只要改 app/build.gradle 的 versionCode / versionName。
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: '发布标签，例如 v1.0.0（留空则用 v<versionName>）'
-        required: false
-        type: string
-  push:
-    tags:
-      - 'v*'
 
 permissions:
   contents: write        # 创建 Release 需要写权限
@@ -62,40 +56,48 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "版本：$name ($code)"
 
-      # 不跑 lint：QUERY_ALL_PACKAGES 是刻意申请的，lint 会拦（侧载应用不关心 Play 政策）。
-      - name: Build release APK
-        run: ./gradlew :app:assembleRelease --console=plain -x lint
-
-      - name: Decode signing keystore
+      # 把 Secret 里的 keystore 还原出来，并生成一份和本地同款的 keystore.properties，
+      # 这样 Gradle 直接编出【已签名】的包 —— 与本地 assembleRelease 同一个签名。
+      - name: Prepare signing config
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "${KEYSTORE_BASE64}" ]; then
-            echo "::error::缺少 secret：SIGNING_KEYSTORE_BASE64"
-            exit 1
-          fi
-          echo "${KEYSTORE_BASE64}" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          ls -la "$RUNNER_TEMP/release.keystore"
-
-      - name: Sign APK
-        env:
           STORE_PASS: ${{ secrets.SIGNING_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          UNSIGNED=app/build/outputs/apk/release/app-release-unsigned.apk
-          OUT="xiaomi-eu-toolkit-${{ steps.ver.outputs.name }}.apk"
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "::error::缺少 secret：SIGNING_KEYSTORE_BASE64"
+            exit 1
+          fi
+          echo "${KEYSTORE_BASE64}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          {
+            echo "storeFile=$RUNNER_TEMP/release.keystore"
+            echo "storePassword=${STORE_PASS}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASS}"
+          } > keystore.properties
+          echo "已生成 keystore.properties（内容不打印）"
+
+      # 不跑 lint：QUERY_ALL_PACKAGES 是刻意申请的，lint 会拦（侧载应用不关心 Play 政策）。
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --console=plain -x lint
+
+      - name: Verify & rename APK
+        run: |
+          set -euo pipefail
+          BASE=app/build/outputs/apk/release
           APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
           if [ ! -x "$APKSIGNER" ]; then
             APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
           fi
-          "$APKSIGNER" sign \
-            --ks "$RUNNER_TEMP/release.keystore" \
-            --ks-pass env:STORE_PASS \
-            --ks-key-alias "${KEY_ALIAS}" \
-            --key-pass env:KEY_PASS \
-            --out "$OUT" "$UNSIGNED"
+          if [ ! -f "$BASE/app-release.apk" ]; then
+            echo "::error::没有产出已签名的 app-release.apk —— keystore.properties 没生效？"
+            ls -la "$BASE"
+            exit 1
+          fi
+          OUT="xiaomi-eu-toolkit-${{ steps.ver.outputs.name }}.apk"
+          cp "$BASE/app-release.apk" "$OUT"
           echo "--- 签名校验 ---"
           "$APKSIGNER" verify --print-certs "$OUT" | head -6
           echo "OUT=$OUT" >> "$GITHUB_ENV"
@@ -103,8 +105,8 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag || format('v{0}', steps.ver.outputs.name) }}
-          name: ${{ inputs.tag || format('v{0}', steps.ver.outputs.name) }}
+          tag_name: v${{ steps.ver.outputs.name }}
+          name: v${{ steps.ver.outputs.name }}
           files: ${{ env.OUT }}
           body: |
             对应源码：${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}

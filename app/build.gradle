@@ -19,8 +19,31 @@ android {
         // 所以最低只能到 29（Android 9 上模块会加载失败）。
         minSdk 29
         targetSdk 37
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.0.1"
+    }
+
+    // 发布签名：从项目根目录的 keystore.properties 读（该文件不进仓库，见 .gitignore）。
+    // 本地放一份，assembleRelease 就产出和 GitHub Actions 同一个签名的包；
+    // 没放也不影响编译，只是 release 退回产出未签名包。
+    // 注意用 UTF-8 读 —— Properties 默认按 ISO-8859-1 解码，路径里的中文会乱码。
+    def ksFile = rootProject.file('keystore.properties')
+    def ksProps = new Properties()
+    if (ksFile.exists()) {
+        ksFile.withReader('UTF-8') { ksProps.load(it) }
+    }
+    def hasReleaseSigning = ksFile.exists()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                // 相对路径按项目根目录解析，避免路径里出现中文
+                storeFile rootProject.file(ksProps['storeFile'])
+                storePassword ksProps['storePassword']
+                keyAlias ksProps['keyAlias']
+                keyPassword ksProps['keyPassword']
+            }
+        }
     }
 
     buildTypes {
@@ -28,6 +51,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
