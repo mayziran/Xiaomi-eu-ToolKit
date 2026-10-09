@@ -60,6 +60,10 @@ data class RegisteredApp(
     val systemApp: Boolean,
     val label: String,
     val uid: Int?,
+    /** 首次安装时间（毫秒），列表排序用；未安装为 null。 */
+    val firstInstallTime: Long? = null,
+    /** 最近更新时间（毫秒），列表排序用；未安装为 null。 */
+    val lastUpdateTime: Long? = null,
 )
 
 data class XmsfRegion(

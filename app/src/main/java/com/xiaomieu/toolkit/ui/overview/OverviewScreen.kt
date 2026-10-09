@@ -32,6 +32,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,9 +89,16 @@ fun OverviewScreen(
             }
 
             is SnapshotUiState.Ready -> {
-                val all = s.snapshot.apps.filter { !hideSystem || !it.systemApp }
-                val filtered = all.filter { matchesFilter(it, filter) && matchesQuery(it, query) }
-                val counts = AppFilter.entries.associateWith { f -> all.count { matchesFilter(it, f) } }
+                // 只在输入 / 筛选 / 设置变化时重算，别每次重组都全量过滤 + 计数。
+                val all = remember(s.snapshot, hideSystem) {
+                    s.snapshot.apps.filter { !hideSystem || !it.systemApp }
+                }
+                val filtered = remember(all, filter, query) {
+                    all.filter { matchesFilter(it, filter) && matchesQuery(it, query) }
+                }
+                val counts = remember(all) {
+                    AppFilter.entries.associateWith { f -> all.count { matchesFilter(it, f) } }
+                }
 
                 Column(Modifier.fillMaxSize().padding(padding)) {
                     if (s.refreshing) {
@@ -138,7 +146,7 @@ fun OverviewScreen(
                             item { EmptyHint() }
                         }
                         items(filtered, key = { it.packageName }) { app ->
-                            AppRow(app = app, onClick = { onOpenDetail(app.packageName) })
+                            AppRow(app = app, onOpen = onOpenDetail)
                             HorizontalDivider()
                         }
                     }
@@ -163,12 +171,12 @@ private fun EmptyHint() {
 }
 
 @Composable
-private fun AppRow(app: RegisteredApp, onClick: () -> Unit) {
+private fun AppRow(app: RegisteredApp, onOpen: (String) -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { onOpen(app.packageName) }
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         AppIcon(app.packageName)

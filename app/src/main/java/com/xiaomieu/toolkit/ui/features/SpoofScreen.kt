@@ -40,11 +40,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.xiaomieu.toolkit.data.AppInfoResolver
 import com.xiaomieu.toolkit.data.model.RegisteredApp
 import com.xiaomieu.toolkit.ui.common.MainViewModel
 import com.xiaomieu.toolkit.ui.common.SnapshotUiState
@@ -71,8 +69,6 @@ fun SpoofScreen(
     onOpenDetail: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val resolver = remember { AppInfoResolver.shared(context) }
     val snapshotState by mainViewModel.state.collectAsStateWithLifecycle()
     val spoofState by viewModel.state.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -81,6 +77,11 @@ fun SpoofScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf(AppSort.NAME) }
+
+    // 行回调固定住：每次重组都新建 lambda，会让列表里每一行都无法跳过重组。
+    val onToggle = remember(viewModel) {
+        { pkg: String, enabled: Boolean -> viewModel.setEnabled(pkg, enabled) }
+    }
 
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -115,7 +116,7 @@ fun SpoofScreen(
                 .filter { matchesQuery(it, query) }
                 // 已开启的应用始终显示：否则开了系统应用再"隐藏系统应用"，它就消失且关不掉了。
                 .filter { !hideSystem || !it.systemApp || it.packageName in enabledPackages }
-                .sortedWith(comparatorFor(sort, resolver))
+                .sortedWith(comparatorFor(sort))
         }
         val canToggle = spoof?.moduleInstalled == true && snapshot?.diagnostics?.rootAvailable == true
 
@@ -196,8 +197,8 @@ fun SpoofScreen(
                     app = app,
                     checked = spoof?.enabled?.contains(app.packageName) == true,
                     switchEnabled = canToggle,
-                    onToggle = { viewModel.setEnabled(app.packageName, it) },
-                    onClick = { onOpenDetail(app.packageName) },
+                    onToggle = onToggle,
+                    onOpen = onOpenDetail,
                 )
                 HorizontalDivider()
             }
@@ -235,14 +236,14 @@ private fun AppToggleRow(
     app: RegisteredApp,
     checked: Boolean,
     switchEnabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit,
+    onToggle: (String, Boolean) -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { onOpen(app.packageName) }
             .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
         AppIcon(app.packageName)
@@ -263,16 +264,20 @@ private fun AppToggleRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        Switch(checked = checked, onCheckedChange = onToggle, enabled = switchEnabled)
+        Switch(
+            checked = checked,
+            onCheckedChange = { onToggle(app.packageName, it) },
+            enabled = switchEnabled,
+        )
     }
 }
 
-private fun comparatorFor(sort: AppSort, resolver: AppInfoResolver): Comparator<RegisteredApp> =
-    when (sort) {
-        AppSort.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }
-        AppSort.UPDATED -> compareByDescending { resolver.lastUpdateTime(it.packageName) ?: 0L }
-        AppSort.INSTALLED -> compareByDescending { resolver.firstInstallTime(it.packageName) ?: 0L }
-    }
+/** 时间取自快照里预计算好的字段，组合期不再调 PackageManager（那是 IPC，会卡 UI）。 */
+private fun comparatorFor(sort: AppSort): Comparator<RegisteredApp> = when (sort) {
+    AppSort.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+    AppSort.UPDATED -> compareByDescending { it.lastUpdateTime ?: 0L }
+    AppSort.INSTALLED -> compareByDescending { it.firstInstallTime ?: 0L }
+}
 
 private fun matchesQuery(app: RegisteredApp, query: String): Boolean {
     if (query.isBlank()) return true

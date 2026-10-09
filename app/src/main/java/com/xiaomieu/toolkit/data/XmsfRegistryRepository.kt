@@ -142,6 +142,9 @@ class XmsfRegistryRepository(
                 systemApp = appInfoResolver.isSystem(pkg),
                 label = appInfoResolver.label(pkg),
                 uid = appInfoResolver.uid(pkg),
+                // 排序用的时间在这里取好：PackageManager 是 IPC，放到组合期会卡 UI。
+                firstInstallTime = appInfoResolver.firstInstallTime(pkg),
+                lastUpdateTime = appInfoResolver.lastUpdateTime(pkg),
             )
         }
     }
