@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -28,18 +28,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       # compileSdk 是 37.2，对应 platform android-37.2；构建工具用 37.0.0。
+      # 这个平台比较新，稳定通道装不到时改走 canary 通道（--channel=3）；
+      # 两条都失败也不直接挂，交给 AGP 自己补下载（真失败会在构建步骤报出来）。
       - name: Install Android SDK packages
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMANAGER" ] || SDKMANAGER="$(command -v sdkmanager)"
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          "$SDKMANAGER" --install \
-            "platform-tools" \
-            "platforms;android-37.0" \
-            "platforms;android-37.2" \
-            "build-tools;37.0.0"
+          PKGS=("platform-tools" "build-tools;37.0.0" "platforms;android-37.2")
+          "$SDKMANAGER" --install "${PKGS[@]}" \
+            || "$SDKMANAGER" --channel=3 --install "${PKGS[@]}" \
+            || echo "::warning::SDK 平台没装全，交给 AGP 自动下载"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       - name: Summarize
         if: success()
