@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Xiaomi.eu ToolKit</string>
-    <string name="xposed_description">面向 xiaomi.eu / HyperOS 国际版的增强工具箱：查看官方 XMSF 的 MiPush 注册情况等</string>
+    <string name="xposed_description">针对 HyperOS 国际版 / xiaomi.eu 的优化工具，主要功能处理 MiPush 相关</string>
 </resources>
