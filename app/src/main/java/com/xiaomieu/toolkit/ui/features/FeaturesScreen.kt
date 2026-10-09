@@ -17,11 +17,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xiaomieu.toolkit.ui.common.MainViewModel
 
 /**
@@ -38,6 +40,11 @@ fun FeaturesScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val hideSystemApps by mainViewModel.hideSystemApps.collectAsStateWithLifecycle()
+    val regionViewModel: RegionSpoofViewModel = viewModel()
+    val region by regionViewModel.state.collectAsStateWithLifecycle()
+
+    // 服务绑定是异步的，进入本页时再确认一次连接状态。
+    LaunchedEffect(Unit) { regionViewModel.refresh() }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("功能") }) },
@@ -55,6 +62,43 @@ fun FeaturesScreen(
                 onClick = onOpenSpoof,
             )
             HorizontalDivider()
+
+            SettingRow(
+                title = "天气：国内数据源",
+                subtitle = when {
+                    !region.connected -> "未连接模块，请先在 LSPosed 中启用本模块"
+                    region.weather -> "已开启：重启天气后切换为国内数据源"
+                    else -> "已关闭：天气使用国际数据源"
+                },
+                checked = region.weather,
+                onCheckedChange = regionViewModel::setWeather,
+                enabled = region.connected,
+            )
+            HorizontalDivider()
+
+            SettingRow(
+                title = "下载管理：迅雷加速",
+                subtitle = when {
+                    !region.connected -> "未连接模块，请先在 LSPosed 中启用本模块"
+                    region.download -> "已开启：重启下载管理后出现迅雷加速"
+                    else -> "已关闭"
+                },
+                checked = region.download,
+                onCheckedChange = regionViewModel::setDownload,
+                enabled = region.connected,
+            )
+            HorizontalDivider()
+
+            if (region.connected && region.missingScope.isNotEmpty()) {
+                Text(
+                    text = "以下应用还没加入本模块作用域，开关不会生效，请在 LSPosed 中勾选：" +
+                        region.missingScope.joinToString(prefix = "\n", separator = "\n"),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                HorizontalDivider()
+            }
 
             SettingRow(
                 title = "隐藏系统应用",
@@ -102,6 +146,7 @@ private fun SettingRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -117,6 +162,6 @@ private fun SettingRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
